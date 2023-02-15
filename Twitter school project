@@ -1,0 +1,166 @@
+
+# import the modules needed 
+import tweepy
+import pandas as pd
+import re
+import itertools
+from collections import Counter as ct
+import collections
+import nltk
+from nltk.corpus import stopwords
+import re
+import networkx
+
+# Copied values from my developer account
+consumer_key = 
+consumer_secret = 
+access_token = 
+access_token_secret = 
+bearer_token=
+
+# authorizing keys to fetch data on Twitter
+auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+# set access to user's access key and access secret
+auth.set_access_token(access_token, access_token_secret)
+
+# calling the api to be able to query 
+
+api = tweepy.API(auth)
+keyword = str(input("Enter hashtag"))
+date = str(input("Enter date: YYYY-MM-DD"))
+tweets = tweepy.Cursor(api.search_tweets, q=keyword, since_id=date, lang='en', tweet_mode = "extended",).items(50) # this is correct
+
+#created columns for Dataframe
+columns = ['DateTime', 'User', 'Retweet_no' ,'Text', 'Location'] 
+
+#empty list made to be able to append in them using for loop 
+data_date= [] 
+data_user= [] 
+data_retweet= [] 
+data_text= [] 
+data_location= [] 
+
+#Created for loop to append data empty lists 
+for tweet in tweets:
+  data_date.append(tweet.created_at)
+  data_user.append(tweet.user.screen_name)
+  data_retweet.append(tweet.retweet_count)
+  data_text.append(tweet.full_text)
+  data_location.append(tweet.geo)
+
+#created dataframe to keep it organize
+tweet_data = pd.DataFrame({columns[0]:data_date, columns[1]:data_user, columns[2]:data_retweet, columns[3]:data_text, columns[4]:data_location})
+tweet_data.head()
+
+tweet_data.to_csv('finalfantatweet.csv')
+
+print(tweet_data)
+
+
+#cleaned remove uncessary signs
+def remove_url(txt):
+    return " ".join(re.sub("([^0-9A-Za-z \t])|(\w+:\/\/\S+)", "", txt).split())
+tweets_nourl= [remove_url(tweet) for tweet in data_text]
+tweets_nourl[:30]
+
+tweets_nourl[0].lower().split()
+
+# Create a list of lists containing lowercase words for each tweet
+tweet_words = [tweet.lower().split() for tweet in tweets_nourl]
+tweet_words[:50]
+
+# List of all words across tweets
+tweets_withouturl = list(itertools.chain(* tweet_words))
+
+# Create counter for of words that are common in all tweets
+count_without_url = collections.Counter(tweets_withouturl)
+count_without_url.most_common(50)
+cleaned_tweets = pd.DataFrame(count_without_url.most_common(50),
+                             columns=['Words', 'No of Counts'])
+
+cleaned_tweets.head()
+
+
+#remove stopword such as wouldn't, shouldn't 
+
+nltk.download('stopwords')
+
+stopwords 
+stop_words = set(stopwords.words('english'))
+list(stop_words)[0:30]
+
+words_in_tweet = [tweet.lower().split() for tweet in tweets_withouturl]
+words_in_tweet[:2]
+
+for all_words in words_in_tweet:
+    for word in all_words:
+        tweets_nsw = [[word for word in tweet_words if not word in stop_words]
+              for tweet_words in words_in_tweet]
+tweets_nsw[0]
+
+all_words_nsw = list(itertools.chain(*tweets_nsw))
+counts_nsw = collections.Counter(all_words_nsw)
+
+#recounted words
+counts_nsw.most_common(50)
+clean_tweets = pd.DataFrame(counts_nsw.most_common(16),
+                             columns=['Words', 'No of Counts'])
+
+clean_tweets.head()
+
+print(clean_tweets)
+
+
+import numpy as np
+import plotly.express as plt
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(8, 8))
+
+# Plot horizontal bar graph
+clean_tweets.sort_values(by='No of Counts').plot.barh(x='Words',
+                      y='No of Counts',
+                      ax=ax, 
+                      color="blue")
+
+ax.set_title("Word Frequency of Tweets")
+
+plt.show()
+
+
+## Visualised tweet using wordcloud to show Most frequent words 
+
+
+df = pd.read_csv('/Users/pamelagumera/Desktop/Python Learning/finalfantatweet.csv')
+
+
+from wordcloud import WordCloud, STOPWORDS
+import imageio
+from imageio import imread
+
+# join tweets to a single string
+words = ' '.join(tweet_data['Text'])
+
+# remove URLs, RTs, and twitter handles
+no_urls_no_tags = " ".join([word for word in words.split()
+                            if 'http' not in word
+                                and not word.startswith('@')
+                                and word != 'RT'
+                            ])
+
+twitter_mask = imageio.imread('/Users/pamelagumera/Desktop/Python Learning/twitter_mask.png')
+
+wordcloud = WordCloud(
+                      font_path='/System/Library/Fonts/Supplemental/Arial.ttf',
+                      stopwords=STOPWORDS,
+                      background_color='white',
+                      width=1800,
+                      height=1400,
+                      mask=twitter_mask
+            ).generate(no_urls_no_tags)
+
+plt.imshow(wordcloud)
+plt.axis("off")
+plt.savefig('./twitter_wc.png', dpi=300)
+plt.show()
